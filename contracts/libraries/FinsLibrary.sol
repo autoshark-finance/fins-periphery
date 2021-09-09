@@ -22,7 +22,7 @@ library FinsLibrary {
                 hex'ff',
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                hex'4cbf3fd8ad5597eff426ad3a7c39cc1a967bbb2db9ad19bff7aeb234a8c6a19e' // init code hash
+                hex'51a2a22318564a1f429d706d52d9898975bf354bdf0ee40d2fc0f02168ba9a80' // init code hash
             ))));
     }
 
