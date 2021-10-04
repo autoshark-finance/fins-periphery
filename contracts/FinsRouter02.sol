@@ -63,6 +63,8 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     address public immutable override factory;
     address public immutable override WETH;
     address public override swapFeeReward;
+    address payable public treasury;
+    mapping(address => bool) public taxableTokens;
 
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, 'FinsV2Router: EXPIRED');
@@ -80,6 +82,10 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
 
     function setSwapFeeReward(address _swapFeeReward) public onlyOwner {
         swapFeeReward = _swapFeeReward;
+    }
+
+    function setTaxableToken(address _token, bool _active) public onlyOwner {
+        taxableTokens[_token] = _active;
     }
 
     // **** ADD LIQUIDITY ****
@@ -271,10 +277,18 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             if (swapFeeReward != address(0)) {
                 ISwapFeeReward(swapFeeReward).swap(msg.sender, input, output, amountOut);
             }
-            address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : _to;
+            bool hasPair = i < path.length - 2;
+            // address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : _to;
+            address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : address(this);
             IFinsPair(FinsLibrary.pairFor(factory, input, output)).swap(
                 amount0Out, amount1Out, to, new bytes(0)
             );
+
+            if (!hasPair) {
+                uint fees = amountOut.mul(84) / 1000; // 0.084 out of 0.25
+                IERC20(output).transfer(treasury, fees);
+                IERC20(output).transfer(_to, amountOut.sub(fees));
+            }
         }
     }
     function swapExactTokensForTokens(

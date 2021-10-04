@@ -22,7 +22,7 @@ library FinsLibrary {
                 hex'ff',
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                hex'51a2a22318564a1f429d706d52d9898975bf354bdf0ee40d2fc0f02168ba9a80' // init code hash
+                hex'024c8482358faf5eeea4ff7f0a18734bc482bf2e61ec04711fcee726756287ee' // init code hash
             ))));
     }
 
@@ -48,9 +48,9 @@ library FinsLibrary {
     function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut, uint swapFee) internal pure returns (uint amountOut) {
         require(amountIn > 0, 'FinsLibrary: INSUFFICIENT_INPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'FinsLibrary: INSUFFICIENT_LIQUIDITY');
-        uint amountInWithFee = amountIn.mul(uint(1000).sub(swapFee));
+        uint amountInWithFee = amountIn.mul(uint(10000).sub(swapFee));
         uint numerator = amountInWithFee.mul(reserveOut);
-        uint denominator = reserveIn.mul(1000).add(amountInWithFee);
+        uint denominator = reserveIn.mul(10000).add(amountInWithFee);
         amountOut = numerator / denominator;
     }
 
@@ -58,8 +58,8 @@ library FinsLibrary {
     function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut, uint swapFee) internal pure returns (uint amountIn) {
         require(amountOut > 0, 'FinsLibrary: INSUFFICIENT_OUTPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'FinsLibrary: INSUFFICIENT_LIQUIDITY');
-        uint numerator = reserveIn.mul(amountOut).mul(1000);
-        uint denominator = reserveOut.sub(amountOut).mul(uint(1000).sub(swapFee));
+        uint numerator = reserveIn.mul(amountOut).mul(10000);
+        uint denominator = reserveOut.sub(amountOut).mul(uint(10000).sub(swapFee));
         amountIn = (numerator / denominator).add(1);
     }
 
