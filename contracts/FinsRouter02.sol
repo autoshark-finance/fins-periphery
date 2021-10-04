@@ -285,7 +285,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             );
 
             if (!hasPair) {
-                uint fees = amountOut.mul(84) / 1000; // 0.084 out of 0.25
+                uint fees = amountOut.mul(84) / 1000; // 0.084 out of 0.3
                 IERC20(output).transfer(treasury, fees);
                 IERC20(output).transfer(_to, amountOut.sub(fees));
             }
@@ -416,15 +416,49 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         address to,
         uint deadline
     ) external virtual override ensure(deadline) {
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amountIn
-        );
-        uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
-        _swapSupportingFeeOnTransferTokens(path, to);
-        require(
-            IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin,
-            'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT'
-        );
+        // First token is not taxable
+        if (!taxableTokens[path[0]]) {
+            TransferHelper.safeTransferFrom(
+                path[0], msg.sender, address(this), amountIn
+            );
+            uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+            IERC20(path[0]).transfer(treasury, fees);
+            IERC20(path[0]).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amountIn.sub(fees));
+            uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
+            _swapSupportingFeeOnTransferTokens(path, to);
+            require(
+                IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin,
+                'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT'
+            );
+        } else if (!taxableTokens[path[path.length - 1]]) { 
+            // Last token not taxable
+            TransferHelper.safeTransferFrom(
+                path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amountIn
+            );
+            uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(address(this));
+            _swapSupportingFeeOnTransferTokens(path, address(this));
+
+            uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+            IERC20(path[path.length - 1]).transfer(treasury, fees);
+
+            uint finalBalance = IERC20(path[path.length - 1]).balanceOf(address(this)).sub(balanceBefore);
+            require(
+                finalBalance >= amountOutMin,
+                'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT'
+            );
+            IERC20(path[path.length - 1]).transfer(to, finalBalance);
+        } else {
+            // Both front and back taxable, hence ignore
+            TransferHelper.safeTransferFrom(
+                path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amountIn
+            );
+            uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
+            _swapSupportingFeeOnTransferTokens(path, to);
+            require(
+                IERC20(path[path.length - 1]).balanceOf(to).sub(balanceBefore) >= amountOutMin,
+                'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT'
+            );
+        }
     }
     function swapExactETHForTokensSupportingFeeOnTransferTokens(
         uint amountOutMin,
@@ -441,6 +475,11 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         require(path[0] == WETH, 'FinsV2Router: INVALID_PATH');
         uint amountIn = msg.value;
         IWETH(WETH).deposit{value: amountIn}();
+        
+        uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+        IERC20(WETH).transfer(treasury, fees);
+        amountIn = amountIn.sub(fees);
+
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amountIn));
         uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
         _swapSupportingFeeOnTransferTokens(path, to);
@@ -467,6 +506,11 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         );
         _swapSupportingFeeOnTransferTokens(path, address(this));
         uint amountOut = IERC20(WETH).balanceOf(address(this));
+
+        uint fees = amountOut.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+        IERC20(WETH).transfer(treasury, fees);
+        amountOut = amountOut.sub(fees);
+
         require(amountOut >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
         IWETH(WETH).withdraw(amountOut);
         TransferHelper.safeTransferETH(to, amountOut);
