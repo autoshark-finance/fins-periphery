@@ -63,7 +63,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     address public immutable override factory;
     address public immutable override WETH;
     address public override swapFeeReward;
-    address payable public treasury;
+    address public treasury;
 
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, 'FinsV2Router: EXPIRED');
@@ -81,6 +81,10 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
 
     function setSwapFeeReward(address _swapFeeReward) public onlyOwner {
         swapFeeReward = _swapFeeReward;
+    }
+
+    function setTreasury(address _treasury) public onlyOwner {
+        treasury = _treasury;
     }
 
     // **** ADD LIQUIDITY ****
