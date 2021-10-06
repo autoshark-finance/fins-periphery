@@ -285,7 +285,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             );
 
             if (!hasPair) {
-                uint fees = amountOut.mul(84) / 1000; // 0.084 out of 0.3
+                uint fees = amountOut.mul(13) / 10000; // 0.130 out of 0.3
                 IERC20(output).transfer(treasury, fees);
                 IERC20(output).transfer(_to, amountOut.sub(fees));
             }
@@ -421,7 +421,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             TransferHelper.safeTransferFrom(
                 path[0], msg.sender, address(this), amountIn
             );
-            uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+            uint fees = amountIn.mul(13).mul(path.length - 1) / 10000; // 0.130 out of 0.3
             IERC20(path[0]).transfer(treasury, fees);
             IERC20(path[0]).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amountIn.sub(fees));
             uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
@@ -438,7 +438,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(address(this));
             _swapSupportingFeeOnTransferTokens(path, address(this));
 
-            uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+            uint fees = amountIn.mul(13).mul(path.length - 1) / 10000; // 0.130 out of 0.3
             IERC20(path[path.length - 1]).transfer(treasury, fees);
 
             uint finalBalance = IERC20(path[path.length - 1]).balanceOf(address(this)).sub(balanceBefore);
@@ -476,7 +476,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         uint amountIn = msg.value;
         IWETH(WETH).deposit{value: amountIn}();
         
-        uint fees = amountIn.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+        uint fees = amountIn.mul(13).mul(path.length - 1) / 10000; // 0.130 out of 0.3
         IERC20(WETH).transfer(treasury, fees);
         amountIn = amountIn.sub(fees);
 
@@ -507,7 +507,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         _swapSupportingFeeOnTransferTokens(path, address(this));
         uint amountOut = IERC20(WETH).balanceOf(address(this));
 
-        uint fees = amountOut.mul(84).mul(path.length - 1) / 1000; // 0.084 out of 0.3
+        uint fees = amountOut.mul(13).mul(path.length - 1) / 10000; // 0.130 out of 0.3
         IERC20(WETH).transfer(treasury, fees);
         amountOut = amountOut.sub(fees);
 

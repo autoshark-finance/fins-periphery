@@ -27,7 +27,7 @@ library FinsLibrary {
     }
 
     function getSwapFee(address factory, address tokenA, address tokenB) internal view returns (uint swapFee) {
-        swapFee = IFinsPair(pairFor(factory, tokenA, tokenB)).swapFee();
+        swapFee = IFinsPair(pairFor(factory, tokenA, tokenB)).swapFee() + 13;
     }
 
     // fetches and sorts the reserves for a pair
