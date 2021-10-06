@@ -64,7 +64,6 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     address public immutable override WETH;
     address public override swapFeeReward;
     address payable public treasury;
-    mapping(address => bool) public taxableTokens;
 
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, 'FinsV2Router: EXPIRED');
@@ -82,10 +81,6 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
 
     function setSwapFeeReward(address _swapFeeReward) public onlyOwner {
         swapFeeReward = _swapFeeReward;
-    }
-
-    function setTaxableToken(address _token, bool _active) public onlyOwner {
-        taxableTokens[_token] = _active;
     }
 
     // **** ADD LIQUIDITY ****
