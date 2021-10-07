@@ -305,7 +305,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         uint deadline
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], false);
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], 0);
         require(amounts[0] + routerSwapFee <= amountInMax, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
@@ -337,7 +337,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[path.length - 1] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], false);
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], 0);
         require(amounts[0] + routerSwapFee <= amountInMax, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
@@ -374,9 +374,9 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[0] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], true);
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0], 1);
         require(amounts[0] + routerSwapFee <= msg.value, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
-        IWETH(WETH).deposit{value: amounts[0] + routerSwapFee}();
+        IWETH(WETH).deposit{value: amounts[0]}();
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
         // refund dust eth, if any
@@ -497,15 +497,22 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         }
     }
 
-    function _chargeRouterFeeForExactTokens(address[] memory path, uint amountIn, bool transferFeeFromThis) internal returns (uint routerSwapFee) {
+    function _chargeRouterFeeForExactTokens(address[] memory path, uint amountIn, uint feeMode) internal returns (uint routerSwapFee) {
         // For `swapTokensForExactTokens()` we need to mark it up based on the calculated amountIn
         uint routerSwapFeeBps = (path.length - 1) * 13;
         routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
 
         // transfer router fee to treasury from msg.sender
-        TransferHelper.safeTransferFrom(
-            path[0], (transferFeeFromThis ? address(this) : msg.sender), treasury, routerSwapFee
-        );
+        if (feeMode == 1) {
+            TransferHelper.safeTransferETH(treasury, routerSwapFee);
+        } else {
+            TransferHelper.safeTransferFrom(
+                path[0], 
+                (feeMode == 2 ? address(this) : msg.sender),
+                treasury, routerSwapFee
+            );
+        }
+        
         if (swapFeeReward != address(0)) {
             IFinsPair pair = IFinsPair(FinsLibrary.pairFor(factory, path[0], path[1]));
             uint pairFeeBps = pair.swapFee();
