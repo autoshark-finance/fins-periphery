@@ -273,11 +273,10 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             (address token0,) = FinsLibrary.sortTokens(input, output);
             uint amountOut = amounts[i + 1];
             (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-            if (swapFeeReward != address(0)) {
+            if (swapFeeReward != address(0) && i > 0) {
                 ISwapFeeReward(swapFeeReward).swap(msg.sender, input, output, amountOut);
             }
             address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : _to;
-            // address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : address(this);
             IFinsPair(FinsLibrary.pairFor(factory, input, output)).swap(
                 amount0Out, amount1Out, to, new bytes(0)
             );
@@ -290,17 +289,9 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         address to,
         uint deadline
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        // take a cut of the router fee on the input token based on path.length
-        // use the amount after the router
-        amountIn = amountIn.sub(routerSwapFee);
+        amountIn = _chargeRouterFee(path, amountIn);
         amounts = FinsLibrary.getAmountsOut(factory, amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
-        // transfer router fee to treasury from msg.sender
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
@@ -314,14 +305,8 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         uint deadline
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        // For `swapTokensForExactTokens()` we need to mark it up based on the calculated amountIn
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amounts[0].mul(routerSwapFeeBps) / 10000;
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0]);
         require(amounts[0] + routerSwapFee <= amountInMax, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
-        // transfer router fee to treasury from msg.sender
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
@@ -336,12 +321,10 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         returns (uint[] memory amounts)
     {
         require(path[0] == WETH, 'FinsV2Router: INVALID_PATH');
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = msg.value.mul(routerSwapFeeBps) / 10000;
-        amounts = FinsLibrary.getAmountsOut(factory, msg.value.sub(routerSwapFee), path);
+        uint amountIn = _chargeRouterFee(path, msg.value);
+        amounts = FinsLibrary.getAmountsOut(factory, amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
-        IWETH(WETH).deposit{value: amounts[0] + routerSwapFee}();
-        assert(IWETH(WETH).transfer(treasury, routerSwapFee));
+        IWETH(WETH).deposit{value: amounts[0]}();
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
     }
@@ -354,14 +337,8 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[path.length - 1] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        // For `swapTokensForExactETH()` we need to mark it up based on the calculated amountIn
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amounts[0].mul(routerSwapFeeBps) / 10000;
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0]);
         require(amounts[0] + routerSwapFee <= amountInMax, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
-        // transfer router fee to treasury from msg.sender
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
@@ -377,17 +354,9 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         returns (uint[] memory amounts)
     {
         require(path[path.length - 1] == WETH, 'FinsV2Router: INVALID_PATH');
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        // take a cut of the router fee on the input token basd on path.length
-        // use the amount after the router
-        amountIn = amountIn.sub(routerSwapFee);
+        amountIn = _chargeRouterFee(path, amountIn);
         amounts = FinsLibrary.getAmountsOut(factory, amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
-        // transfer router fee to treasury from msg.sender
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]
         );
@@ -405,12 +374,9 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[0] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        // For `swapETHForExactTokens()` we need to mark it up based on the calculated amountIn
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amounts[0].mul(routerSwapFeeBps) / 10000;
+        uint routerSwapFee = _chargeRouterFeeForExactTokens(path, amounts[0]);
         require(amounts[0] + routerSwapFee <= msg.value, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
         IWETH(WETH).deposit{value: amounts[0] + routerSwapFee}();
-        assert(IWETH(WETH).transfer(treasury, routerSwapFee));
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
         // refund dust eth, if any
@@ -447,13 +413,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         address to,
         uint deadline
     ) external virtual override ensure(deadline) {
-        // transfer router fee to treasury from msg.sender
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        amountIn = amountIn.sub(routerSwapFee);
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
+        amountIn = _chargeRouterFee(path, amountIn);
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amountIn
         );
@@ -480,11 +440,8 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         uint amountIn = msg.value;
         IWETH(WETH).deposit{value: amountIn}();
 
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        amountIn = amountIn.sub(routerSwapFee);
+        amountIn = _chargeRouterFee(path, amountIn);
 
-        assert(IWETH(WETH).transfer(treasury, routerSwapFee));
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amountIn));
         uint balanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
         _swapSupportingFeeOnTransferTokens(path, to);
@@ -506,12 +463,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         ensure(deadline)
     {
         require(path[path.length - 1] == WETH, 'FinsV2Router: INVALID_PATH');
-        uint routerSwapFeeBps = (path.length - 1) * 13;
-        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        amountIn = amountIn.sub(routerSwapFee);
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, treasury, routerSwapFee
-        );
+        amountIn = _chargeRouterFee(path, amountIn);
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, FinsLibrary.pairFor(factory, path[0], path[1]), amountIn
         );
@@ -520,6 +472,41 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         require(amountOut >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
         IWETH(WETH).withdraw(amountOut);
         TransferHelper.safeTransferETH(to, amountOut);
+    }
+
+    function _chargeRouterFee(address[] memory path, uint amountIn) internal returns (uint adjustedAmountIn) {
+        // transfer router fee to treasury from msg.sender
+        uint routerSwapFeeBps = (path.length - 1) * 13;
+        uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
+        adjustedAmountIn = amountIn.sub(routerSwapFee);
+        TransferHelper.safeTransferFrom(
+            path[0], msg.sender, treasury, routerSwapFee
+        );
+        if (swapFeeReward != address(0)) {
+            IFinsPair pair = IFinsPair(FinsLibrary.pairFor(factory, path[0], path[1]));
+            uint pairFeeBps = pair.swapFee();
+            uint adjustedAmountInForCorrectSwapFee = amountIn * routerSwapFeeBps / pairFeeBps;
+            // we use path[0] as output token cos the fee is charged on path[0]
+            ISwapFeeReward(swapFeeReward).swap(msg.sender, path[1], path[0], adjustedAmountInForCorrectSwapFee);
+        }
+    }
+
+    function _chargeRouterFeeForExactTokens(address[] memory path, uint amountIn) internal returns (uint routerSwapFee) {
+        // For `swapTokensForExactTokens()` we need to mark it up based on the calculated amountIn
+        uint routerSwapFeeBps = (path.length - 1) * 13;
+        routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
+
+        // transfer router fee to treasury from msg.sender
+        TransferHelper.safeTransferFrom(
+            path[0], msg.sender, treasury, routerSwapFee
+        );
+        if (swapFeeReward != address(0)) {
+            IFinsPair pair = IFinsPair(FinsLibrary.pairFor(factory, path[0], path[1]));
+            uint pairFeeBps = pair.swapFee();
+            uint adjustedAmountInForCorrectSwapFee = amountIn * routerSwapFeeBps / pairFeeBps;
+            // we use path[0] as output token cos the fee is charged on path[0]
+            ISwapFeeReward(swapFeeReward).swap(msg.sender, path[1], path[0], adjustedAmountInForCorrectSwapFee);
+        }
     }
 
     // **** LIBRARY FUNCTIONS ****
