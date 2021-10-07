@@ -281,12 +281,6 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             IFinsPair(FinsLibrary.pairFor(factory, input, output)).swap(
                 amount0Out, amount1Out, to, new bytes(0)
             );
-
-            // if (!hasPair) {
-            //     uint fees = amountOut.mul(13).mul(path.length - 1) / 10000; // 0.130 out of 0.3
-            //     IERC20(output).transfer(treasury, fees);
-            //     IERC20(output).transfer(_to, amountOut.sub(fees));
-            // }
         }
     }
     function swapExactTokensForTokens(
@@ -298,7 +292,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
         uint routerSwapFeeBps = (path.length - 1) * 13;
         uint routerSwapFee = amountIn.mul(routerSwapFeeBps) / 10000;
-        // take a cut of the router fee on the input token basd on path.length
+        // take a cut of the router fee on the input token based on path.length
         // use the amount after the router
         amountIn = amountIn.sub(routerSwapFee);
         amounts = FinsLibrary.getAmountsOut(factory, amountIn, path);
@@ -346,9 +340,9 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
         uint routerSwapFee = msg.value.mul(routerSwapFeeBps) / 10000;
         amounts = FinsLibrary.getAmountsOut(factory, msg.value.sub(routerSwapFee), path);
         require(amounts[amounts.length - 1] >= amountOutMin, 'FinsV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
-        IWETH(WETH).deposit{value: amounts[0]}();
+        IWETH(WETH).deposit{value: amounts[0] + routerSwapFee}();
         assert(IWETH(WETH).transfer(treasury, routerSwapFee));
-        assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0] - routerSwapFee));
+        assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
     }
     function swapTokensForExactETH(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline)
@@ -360,7 +354,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[path.length - 1] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        // For `swapTokensForExactTokens()` we need to mark it up based on the calculated amountIn
+        // For `swapTokensForExactETH()` we need to mark it up based on the calculated amountIn
         uint routerSwapFeeBps = (path.length - 1) * 13;
         uint routerSwapFee = amounts[0].mul(routerSwapFeeBps) / 10000;
         require(amounts[0] + routerSwapFee <= amountInMax, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
@@ -411,11 +405,11 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
     {
         require(path[0] == WETH, 'FinsV2Router: INVALID_PATH');
         amounts = FinsLibrary.getAmountsIn(factory, amountOut, path);
-        // For `swapTokensForExactTokens()` we need to mark it up based on the calculated amountIn
+        // For `swapETHForExactTokens()` we need to mark it up based on the calculated amountIn
         uint routerSwapFeeBps = (path.length - 1) * 13;
         uint routerSwapFee = amounts[0].mul(routerSwapFeeBps) / 10000;
         require(amounts[0] + routerSwapFee <= msg.value, 'FinsV2Router: EXCESSIVE_INPUT_AMOUNT');
-        IWETH(WETH).deposit{value: amounts[0]}();
+        IWETH(WETH).deposit{value: amounts[0] + routerSwapFee}();
         assert(IWETH(WETH).transfer(treasury, routerSwapFee));
         assert(IWETH(WETH).transfer(FinsLibrary.pairFor(factory, path[0], path[1]), amounts[0]));
         _swap(amounts, path, to);
