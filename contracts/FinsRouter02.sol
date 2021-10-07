@@ -273,7 +273,7 @@ contract FinsRouter02 is IFinsRouter02, Ownable {
             (address token0,) = FinsLibrary.sortTokens(input, output);
             uint amountOut = amounts[i + 1];
             (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-            if (swapFeeReward != address(0) && i > 0) {
+            if (swapFeeReward != address(0)) {
                 ISwapFeeReward(swapFeeReward).swap(msg.sender, input, output, amountOut);
             }
             address to = i < path.length - 2 ? FinsLibrary.pairFor(factory, output, path[i + 2]) : _to;
